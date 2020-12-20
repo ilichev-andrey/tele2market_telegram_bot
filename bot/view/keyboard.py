@@ -1,6 +1,6 @@
 from typing import Tuple
 
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 
 def create_reply_keyboard_markup(button_names: Tuple) -> ReplyKeyboardMarkup:
@@ -9,3 +9,7 @@ def create_reply_keyboard_markup(button_names: Tuple) -> ReplyKeyboardMarkup:
         poll_keyboard.add(KeyboardButton(text=button_name))
 
     return poll_keyboard
+
+
+def remove_reply_keyboard() -> ReplyKeyboardRemove:
+    return ReplyKeyboardRemove()
