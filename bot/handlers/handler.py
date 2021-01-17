@@ -4,11 +4,15 @@ from aiogram import Dispatcher, types
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from tele2client import event, containers as tele2containers
 from tele2client.client import Tele2Client
+from tele2client.exceptions import BaseTele2ClientException
+from tele2client.wrappers.logger import LoggerWrap
 
 from bot import containers
 from bot.handlers import input_remains
 from bot.handlers.user_input import converter, validator
 from bot.view import buttons, keyboard, static
+from executor.task_manager import TaskQueue
+from executor.containers import Task, TaskSummary
 
 
 class BotStates(StatesGroup):
@@ -19,11 +23,13 @@ class BotStates(StatesGroup):
 
 class Handler(object):
     _dispatcher: Dispatcher
+    _task_queue: TaskQueue
     _users_data: Dict[str, containers.UserData]
     _input_remains: input_remains.InputRemainsHandler
 
-    def __init__(self, dispatcher: Dispatcher):
+    def __init__(self, dispatcher: Dispatcher, task_queue: TaskQueue):
         self._dispatcher = dispatcher
+        self._task_queue = task_queue
         self._users_data = {}
         self._input_remains = input_remains.InputRemainsHandler(dispatcher, self._on_input_remains)
 
@@ -80,8 +86,15 @@ class Handler(object):
 
         if not await client.auth(get_sms_code):
             await message.answer(static.FAILED_AUTHORIZATION)
+            return
 
-        remain_counter = await client.get_sellable_rests()
+        try:
+            remain_counter = await client.get_sellable_rests()
+        except BaseTele2ClientException as e:
+            LoggerWrap().get_logger().exception(str(e))
+            await message.answer(static.INTERNAL_ERROR)
+            return
+
         await message.answer(f'{static.REMAINS}\n{self._remain_counter_to_string(remain_counter)}')
 
         await BotStates.input_remains.set()
@@ -93,7 +106,13 @@ class Handler(object):
     async def _on_input_remains(self, input_user_remains: containers.InputUserRemains):
         user_hash = self._get_user_hash(input_user_remains.chat_id, input_user_remains.user_id)
         user_data = self._get_user_data(user_hash)
-        remain_counter = await user_data.tele2client.get_sellable_rests()
+
+        try:
+            remain_counter = await user_data.tele2client.get_sellable_rests()
+        except BaseTele2ClientException as e:
+            LoggerWrap().get_logger().exception(str(e))
+            return
+
         normalized_remain_counter = self._normalize_remains(input_user_remains, remain_counter)
 
         remain_counter_str = self._remain_counter_to_string(normalized_remain_counter)
@@ -102,8 +121,12 @@ class Handler(object):
         else:
             message = f'{static.SELL_COUNT}: {remain_counter_str}'
         await self._dispatcher.bot.send_message(input_user_remains.chat_id, message)
+        await self._dispatcher.bot.send_message(input_user_remains.chat_id, static.REMARK_ABOUT_NOTIFICATION)
+
         state = self._dispatcher.current_state(chat=input_user_remains.chat_id, user=input_user_remains.user_id)
         await state.finish()
+
+        self._add_task(user_data.tele2client, normalized_remain_counter)
 
     def _get_user_hash_by_message(self, message: types.Message) -> str:
         return self._get_user_hash(message.chat.id, message.from_user.id)
@@ -119,6 +142,17 @@ class Handler(object):
 
     def _get_user_data(self, user_hash: str) -> containers.UserData:
         return self._users_data.get(user_hash, containers.UserData())
+
+    def _add_task(self, tele2client: Tele2Client, remain_counter: tele2containers.RemainCounter):
+        self._task_queue.put_nowait(Task(
+            tele2client=tele2client,
+            lots=[],
+            summary=TaskSummary(
+                gigabyte_count=int(remain_counter.gigabytes),
+                minute_count=remain_counter.minutes,
+                sms_count=remain_counter.sms
+            )
+        ))
 
     @staticmethod
     def _normalize_remains(
