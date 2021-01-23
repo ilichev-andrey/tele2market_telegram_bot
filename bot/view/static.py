@@ -10,7 +10,7 @@ INPUT_PHONE_NUMBER = f'{INPUT} номер телефона Tele2 в формат
 INPUT_SMS_CODE = f'{INPUT} полученный смс код'
 
 REQUEST_REMAINS = 'Получить доступные остатки тарифа для продажи'
-REMAINS = 'Остатки тарифа для продажи:'
+REMAINS = 'Доступные остатки для продажи:'
 
 SELECT_REMAINS = f'{SELECT} сколько хотите продать'
 INTERNET_REMAINS = 'гигабайт'

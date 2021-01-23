@@ -10,7 +10,7 @@ from tele2client.wrappers.logger import LoggerWrap
 from bot import containers
 from bot.handlers import input_remains
 from bot.handlers.user_input import converter, validator
-from bot.view import buttons, keyboard, static
+from bot.view import buttons, containers as view_containers, keyboard, static
 from executor.task_manager import TaskQueue
 from executor.containers import Task, TaskSummary
 
@@ -95,7 +95,7 @@ class Handler(object):
             await message.answer(static.INTERNAL_ERROR)
             return
 
-        await message.answer(f'{static.REMAINS}\n{self._remain_counter_to_string(remain_counter)}')
+        await message.answer(f'{static.REMAINS}\n{view_containers.remain_counter_to_string(remain_counter)}')
 
         await BotStates.input_remains.set()
         await message.answer(
@@ -115,7 +115,7 @@ class Handler(object):
 
         normalized_remain_counter = self._normalize_remains(input_user_remains, remain_counter)
 
-        remain_counter_str = self._remain_counter_to_string(normalized_remain_counter)
+        remain_counter_str = view_containers.remain_counter_to_string(normalized_remain_counter)
         if normalized_remain_counter != remain_counter:
             message = f'{static.LIMIT_REACHED} {remain_counter_str}'
         else:
@@ -164,9 +164,3 @@ class Handler(object):
             gigabytes=min(remains.internet, int(remain_counter.gigabytes)),
             sms=min(remains.sms, remain_counter.sms)
         )
-
-    @staticmethod
-    def _remain_counter_to_string(remain_counter: tele2containers.RemainCounter) -> str:
-        return f'{static.INTERNET_REMAINS}: {round(remain_counter.gigabytes, 2)}\n' \
-               f'{static.VOICE_REMAINS}: {remain_counter.minutes}\n' \
-               f'{static.SMS_REMAINS}: {remain_counter.sms}'

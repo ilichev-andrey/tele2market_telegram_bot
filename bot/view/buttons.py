@@ -2,4 +2,4 @@ from enum import Enum
 
 
 class Buttons(Enum):
-    SELECT_REMAINS = 'Указать продаваемые остатки'
+    SELECT_REMAINS = 'Начать продавать'

@@ -56,10 +56,7 @@ class TaskManager(object):
             else:
                 client = task.tele2client
 
-            client = await self.create_new_client(client)
-            self.clients.add(client)
-            task.lots.extend(await self.lot_manager.create(task.summary, client))
-
+            self.clients.add(await self.create_new_client(client))
         self.tasks.extend(tasks)
 
     @staticmethod
